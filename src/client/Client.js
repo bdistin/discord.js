@@ -296,9 +296,8 @@ class Client extends BaseClient {
    * @returns {Promise<Invite>}
    * @example
    * client.fetchInvite('https://discord.gg/bRCvFy9')
-   *  .then(invite => {
-   *    console.log(`Obtained invite with code: ${invite.code}`);
-   *  }).catch(console.error);
+   *   .then(invite => console.log(`Obtained invite with code: ${invite.code}`)
+   *   .catch(console.error);
    */
   fetchInvite(invite) {
     const code = DataResolver.resolveInviteCode(invite);
@@ -313,9 +312,8 @@ class Client extends BaseClient {
    * @returns {Promise<Webhook>}
    * @example
    * client.fetchWebhook('id', 'token')
-   *  .then(webhook => {
-   *    console.log(`Obtained webhook with name: ${webhook.name}`);
-   *  }).catch(console.error);
+   *   .then(webhook => console.log(`Obtained webhook with name: ${webhook.name}`))
+   *   .catch(console.error);
    */
   fetchWebhook(id, token) {
     return this.api.webhooks(id, token).get().then(data => new Webhook(this, data));
@@ -326,9 +324,8 @@ class Client extends BaseClient {
    * @returns {Collection<string, VoiceRegion>}
    * @example
    * client.fetchVoiceRegions()
-   *  .then(regions => {
-   *    console.log(`Available regions are: ${regions.map(region => region.name).join(', ')}`);
-   *  }).catch(console.error);
+   *   .then(regions => console.log(`Available regions are: ${regions.map(region => region.name).join(', ')}`))
+   *   .catch(console.error);
    */
   fetchVoiceRegions() {
     return this.api.voice.regions.get().then(res => {
@@ -368,12 +365,9 @@ class Client extends BaseClient {
       if (!channel.messages) continue;
       channels++;
 
-      for (const message of channel.messages.values()) {
-        if (now - (message.editedTimestamp || message.createdTimestamp) > lifetimeMs) {
-          channel.messages.delete(message.id);
-          messages++;
-        }
-      }
+      messages += channel.messages.sweep(
+        message => now - (message.editedTimestamp || message.createdTimestamp) > lifetimeMs
+      );
     }
 
     this.emit(Events.DEBUG,
@@ -387,9 +381,8 @@ class Client extends BaseClient {
    * @returns {Promise<ClientApplication>}
    * @example
    * client.fetchApplication('id')
-   *  .then(application => {
-   *    console.log(`Obtained application with name: ${application.name}`);
-   *  }).catch(console.error);
+   *   .then(application => console.log(`Obtained application with name: ${application.name}`)
+   *   .catch(console.error);
    */
   fetchApplication(id = '@me') {
     return this.api.oauth2.applications(id).get()
@@ -399,20 +392,15 @@ class Client extends BaseClient {
   /**
    * Generates a link that can be used to invite the bot to a guild.
    * <warn>This is only available when using a bot account.</warn>
-   * @param {PermissionResolvable[]|number} [permissions] Permissions to request
+   * @param {PermissionResolvable} [permissions] Permissions to request
    * @returns {Promise<string>}
    * @example
    * client.generateInvite(['SEND_MESSAGES', 'MANAGE_GUILD', 'MENTION_EVERYONE'])
-   *   .then(link => {
-   *     console.log(`Generated bot invite link: ${link}`);
-   *   }).catch(console.error);
+   *   .then(link => console.log(`Generated bot invite link: ${link}`))
+   *   .catch(console.error);
    */
   generateInvite(permissions) {
-    if (permissions) {
-      if (permissions instanceof Array) permissions = Permissions.resolve(permissions);
-    } else {
-      permissions = 0;
-    }
+    permissions = typeof permissions === 'undefined' ? 0 : Permissions.resolve(permissions);
     return this.fetchApplication().then(application =>
       `https://discordapp.com/oauth2/authorize?client_id=${application.id}&permissions=${permissions}&scope=bot`
     );
@@ -470,6 +458,9 @@ class Client extends BaseClient {
     }
     if (typeof options.restWsBridgeTimeout !== 'number' || isNaN(options.restWsBridgeTimeout)) {
       throw new TypeError('CLIENT_INVALID_OPTION', 'restWsBridgeTimeout', 'a number');
+    }
+    if (typeof options.restSweepInterval !== 'number' || isNaN(options.restSweepInterval)) {
+      throw new TypeError('CLIENT_INVALID_OPTION', 'restSweepInterval', 'a number');
     }
     if (!(options.disabledEvents instanceof Array)) {
       throw new TypeError('CLIENT_INVALID_OPTION', 'disabledEvents', 'an Array');

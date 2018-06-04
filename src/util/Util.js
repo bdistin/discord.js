@@ -1,4 +1,5 @@
 const snekfetch = require('snekfetch');
+const Collection = require('./Collection');
 const { Colors, DefaultOptions, Endpoints } = require('./Constants');
 const { Error: DiscordError, RangeError, TypeError } = require('../errors');
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -50,7 +51,7 @@ class Util {
   /**
    * Splits a string into multiple chunks at a designated character that do not exceed a specific length.
    * @param {string} text Content to split
-   * @param {SplitOptions} [options] Options controlling the behaviour of the split
+   * @param {SplitOptions} [options] Options controlling the behavior of the split
    * @returns {string|string[]}
    */
   static splitMessage(text, { maxLength = 2000, char = '\n', prepend = '', append = '' } = {}) {
@@ -115,25 +116,6 @@ class Util {
     const m = text.match(/<?(a)?:?(\w{2,32}):(\d{17,19})>?/);
     if (!m) return null;
     return { animated: Boolean(m[1]), name: m[2], id: m[3] };
-  }
-
-  /**
-   * Checks whether the arrays are equal, also removes duplicated entries from b.
-   * @param {Array<*>} a Array which will not be modified.
-   * @param {Array<*>} b Array to remove duplicated entries from.
-   * @returns {boolean} Whether the arrays are equal.
-   * @private
-   */
-  static arraysEqual(a, b) {
-    if (a === b) return true;
-    if (a.length !== b.length) return false;
-
-    for (const item of a) {
-      const ind = b.indexOf(item);
-      if (ind !== -1) b.splice(ind, 1);
-    }
-
-    return b.length === 0;
   }
 
   /**
@@ -412,6 +394,33 @@ class Util {
     return new Promise(resolve => {
       setTimeout(resolve, ms);
     });
+  }
+
+  /**
+   * Adds methods from collections and maps onto the provided store
+   * @param {DataStore} store The store to mixin
+   * @param {string[]} ignored The properties to ignore
+   * @private
+   */
+  /* eslint-disable func-names */
+  static mixin(store, ignored) {
+    Object.getOwnPropertyNames(Collection.prototype)
+      .concat(Object.getOwnPropertyNames(Map.prototype)).forEach(prop => {
+        if (ignored.includes(prop)) return;
+        if (prop === 'size') {
+          Object.defineProperty(store.prototype, prop, {
+            get: function() {
+              return this._filtered[prop];
+            },
+          });
+          return;
+        }
+        const func = Collection.prototype[prop];
+        if (prop === 'constructor' || typeof func !== 'function') return;
+        store.prototype[prop] = function(...args) {
+          return func.apply(this._filtered, args);
+        };
+      });
   }
 }
 

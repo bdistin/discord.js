@@ -7,8 +7,8 @@ const FRAME_LENGTH = 20;
 const CHANNELS = 2;
 const TIMESTAMP_INC = (48000 / 100) * CHANNELS;
 
+const MAX_NONCE_SIZE = (2 ** 32) - 1;
 const nonce = Buffer.alloc(24);
-nonce.fill(0);
 
 /**
  * @external WritableStream
@@ -41,6 +41,9 @@ class StreamDispatcher extends Writable {
     this.player = player;
     this.streamOptions = streamOptions;
     this.streams = streams;
+
+    this._nonce = 0;
+    this._nonceBuffer = Buffer.alloc(24);
 
     /**
      * The time that the stream was paused at (null if not paused)
@@ -118,7 +121,8 @@ class StreamDispatcher extends Writable {
    * Pauses playback
    */
   pause() {
-    this.pausedSince = Date.now();
+    this._setSpeaking(false);
+    if (!this.paused) this.pausedSince = Date.now();
   }
 
   /**
@@ -199,7 +203,9 @@ class StreamDispatcher extends Writable {
     if (this.pausedSince) return;
     if (!this.streams.broadcast) {
       const next = FRAME_LENGTH + (this.count * FRAME_LENGTH) - (Date.now() - this.startTime - this.pausedTime);
-      setTimeout(this._writeCallback.bind(this), next);
+      setTimeout(() => {
+        if (!this.pausedSince && this._writeCallback) this._writeCallback();
+      }, next);
     }
     this._sdata.sequence++;
     this._sdata.timestamp += TIMESTAMP_INC;
@@ -214,9 +220,26 @@ class StreamDispatcher extends Writable {
     this._sendPacket(this._createPacket(this._sdata.sequence, this._sdata.timestamp, chunk));
   }
 
+  _encrypt(buffer) {
+    const { secretKey, encryptionMode } = this.player.voiceConnection.authentication;
+    if (encryptionMode === 'xsalsa20_poly1305_lite') {
+      this._nonce++;
+      if (this._nonce > MAX_NONCE_SIZE) this._nonce = 0;
+      this._nonceBuffer.writeUInt32BE(this._nonce, 0);
+      return [
+        secretbox.methods.close(buffer, this._nonceBuffer, secretKey),
+        this._nonceBuffer.slice(0, 4),
+      ];
+    } else if (encryptionMode === 'xsalsa20_poly1305_suffix') {
+      const random = secretbox.methods.random(24);
+      return [secretbox.methods.close(buffer, random, secretKey), random];
+    } else {
+      return [secretbox.methods.close(buffer, nonce, secretKey)];
+    }
+  }
+
   _createPacket(sequence, timestamp, buffer) {
-    const packetBuffer = Buffer.alloc(buffer.length + 28);
-    packetBuffer.fill(0);
+    const packetBuffer = Buffer.alloc(12);
     packetBuffer[0] = 0x80;
     packetBuffer[1] = 0x78;
 
@@ -225,10 +248,7 @@ class StreamDispatcher extends Writable {
     packetBuffer.writeUIntBE(this.player.voiceConnection.authentication.ssrc, 8, 4);
 
     packetBuffer.copy(nonce, 0, 0, 12);
-    buffer = secretbox.methods.close(buffer, nonce, this.player.voiceConnection.authentication.secretKey);
-    for (let i = 0; i < buffer.length; i++) packetBuffer[i + 12] = buffer[i];
-
-    return packetBuffer;
+    return Buffer.concat([packetBuffer, ...this._encrypt(buffer, sequence)]);
   }
 
   _sendPacket(packet) {
@@ -242,6 +262,7 @@ class StreamDispatcher extends Writable {
     while (repeats--) {
       if (!this.player.voiceConnection.sockets.udp) {
         this.emit('debug', 'Failed to send a packet - no UDP socket');
+        return;
       }
       this.player.voiceConnection.sockets.udp.send(packet)
         .catch(e => {
@@ -252,7 +273,9 @@ class StreamDispatcher extends Writable {
   }
 
   _setSpeaking(value) {
-    this.player.voiceConnection.setSpeaking(value);
+    if (typeof this.player.voiceConnection !== 'undefined') {
+      this.player.voiceConnection.setSpeaking(value);
+    }
     /**
      * Emitted when the dispatcher starts/stops speaking.
      * @event StreamDispatcher#speaking

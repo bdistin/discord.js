@@ -131,7 +131,7 @@ class Message extends Base {
     this.webhookID = data.webhook_id || null;
 
     /**
-     * Supplimental application information for group activities
+     * Supplemental application information for group activities
      * @type {?ClientApplication}
      */
     this.application = data.application ? new ClientApplication(this.client, data.application) : null;
@@ -157,6 +157,12 @@ class Message extends Base {
      * @private
      */
     this._edits = [];
+
+    /**
+     * Whether this message has been deleted
+     * @type {boolean}
+     */
+    this.deleted = false;
   }
 
   /**
@@ -341,9 +347,9 @@ class Message extends Base {
    * @readonly
    */
   get deletable() {
-    return this.author.id === this.client.user.id || (this.guild &&
+    return !this.deleted && (this.author.id === this.client.user.id || (this.guild &&
       this.channel.permissionsFor(this.client.user).has(Permissions.FLAGS.MANAGE_MESSAGES)
-    );
+    ));
   }
 
   /**

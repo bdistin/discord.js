@@ -8,6 +8,12 @@ const EventEmitter = require('events');
 const { Error } = require('../../errors');
 const PlayInterface = require('./util/PlayInterface');
 
+const SUPPORTED_MODES = [
+  'xsalsa20_poly1305_lite',
+  'xsalsa20_poly1305_suffix',
+  'xsalsa20_poly1305',
+];
+
 /**
  * Represents a connection to a guild's voice server.
  * ```js
@@ -133,6 +139,7 @@ class VoiceConnection extends EventEmitter {
       d: {
         speaking: this.speaking,
         delay: 0,
+        ssrc: this.authentication.ssrc,
       },
     }).catch(e => {
       this.emit('debug', e);
@@ -250,6 +257,11 @@ class VoiceConnection extends EventEmitter {
        */
       this.emit('failed', new Error(reason));
     } else {
+      /**
+       * Emitted whenever the connection encounters an error.
+       * @event VoiceConnection#error
+       * @param {Error} error The encountered error
+       */
       this.emit('error', new Error(reason));
     }
     this.status = VoiceStatus.DISCONNECTED;
@@ -284,7 +296,7 @@ class VoiceConnection extends EventEmitter {
   reconnect(token, endpoint) {
     this.authentication.token = token;
     this.authentication.endpoint = endpoint;
-
+    this.speaking = false;
     this.status = VoiceStatus.RECONNECTING;
     /**
      * Emitted when the voice connection is reconnecting (typically after a region change).
@@ -299,6 +311,9 @@ class VoiceConnection extends EventEmitter {
    */
   disconnect() {
     this.emit('closing');
+    clearTimeout(this.connectTimeout);
+    const conn = this.voiceManager.connections.get(this.channel.guild.id);
+    if (conn === this) this.voiceManager.connections.delete(this.channel.guild.id);
     this.sendVoiceStateUpdate({
       channel_id: null,
     });
@@ -326,7 +341,7 @@ class VoiceConnection extends EventEmitter {
    */
   cleanup() {
     this.player.destroy();
-
+    this.speaking = false;
     const { ws, udp } = this.sockets;
 
     if (ws) {
@@ -372,20 +387,17 @@ class VoiceConnection extends EventEmitter {
    * @param {Object} data The received data
    * @private
    */
-  onReady({ port, ssrc }) {
+  onReady({ port, ssrc, ip, modes }) {
     this.authentication.port = port;
     this.authentication.ssrc = ssrc;
-
-    const udp = this.sockets.udp;
-    /**
-     * Emitted whenever the connection encounters an error.
-     * @event VoiceConnection#error
-     * @param {Error} error The encountered error
-     */
-    udp.findEndpointAddress()
-      .then(address => {
-        udp.createUDPSocket(address);
-      }, e => this.emit('error', e));
+    for (let mode of modes) {
+      if (SUPPORTED_MODES.includes(mode)) {
+        this.authentication.encryptionMode = mode;
+        this.emit('debug', `Selecting the ${mode} mode`);
+        break;
+      }
+    }
+    this.sockets.udp.createUDPSocket(ip);
   }
 
   /**
@@ -422,7 +434,14 @@ class VoiceConnection extends EventEmitter {
      * @param {User} user The user that has started/stopped speaking
      * @param {boolean} speaking Whether or not the user is speaking
      */
-    if (this.status === VoiceStatus.CONNECTED) this.emit('speaking', user, speaking);
+    if (this.status === VoiceStatus.CONNECTED) {
+      this.emit('speaking', user, speaking);
+      if (!speaking) {
+        for (const receiver of this.receivers) {
+          receiver.packets._stoppedSpeaking(user_id);
+        }
+      }
+    }
     guild._memberSpeakUpdate(user_id, speaking);
   }
 
