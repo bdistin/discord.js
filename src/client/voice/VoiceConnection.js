@@ -8,6 +8,12 @@ const EventEmitter = require('events');
 const { Error } = require('../../errors');
 const PlayInterface = require('./util/PlayInterface');
 
+const SUPPORTED_MODES = [
+  'xsalsa20_poly1305_lite',
+  'xsalsa20_poly1305_suffix',
+  'xsalsa20_poly1305',
+];
+
 /**
  * Represents a connection to a guild's voice server.
  * ```js
@@ -252,6 +258,11 @@ class VoiceConnection extends EventEmitter {
        */
       this.emit('failed', new Error(reason));
     } else {
+      /**
+       * Emitted whenever the connection encounters an error.
+       * @event VoiceConnection#error
+       * @param {Error} error The encountered error
+       */
       this.emit('error', new Error(reason));
     }
     this.status = VoiceStatus.DISCONNECTED;
@@ -377,20 +388,17 @@ class VoiceConnection extends EventEmitter {
    * @param {Object} data The received data
    * @private
    */
-  onReady({ port, ssrc }) {
+  onReady({ port, ssrc, ip, modes }) {
     this.authentication.port = port;
     this.authentication.ssrc = ssrc;
-
-    const udp = this.sockets.udp;
-    /**
-     * Emitted whenever the connection encounters an error.
-     * @event VoiceConnection#error
-     * @param {Error} error The encountered error
-     */
-    udp.findEndpointAddress()
-      .then(address => {
-        udp.createUDPSocket(address);
-      }, e => this.emit('error', e));
+    for (let mode of modes) {
+      if (SUPPORTED_MODES.includes(mode)) {
+        this.authentication.encryptionMode = mode;
+        this.emit('debug', `Selecting the ${mode} mode`);
+        break;
+      }
+    }
+    this.sockets.udp.createUDPSocket(ip);
   }
 
   /**

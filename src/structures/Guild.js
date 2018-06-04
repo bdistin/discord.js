@@ -2,7 +2,7 @@ const Invite = require('./Invite');
 const GuildAuditLogs = require('./GuildAuditLogs');
 const Webhook = require('./Webhook');
 const VoiceRegion = require('./VoiceRegion');
-const { ChannelTypes, Events, browser } = require('../util/Constants');
+const { ChannelTypes, DefaultMessageNotifications, Events, browser } = require('../util/Constants');
 const Collection = require('../util/Collection');
 const Util = require('../util/Util');
 const DataResolver = require('../util/DataResolver');
@@ -49,6 +49,12 @@ class Guild extends Base {
      * @type {PresenceStore<Snowflake, Presence>}
      */
     this.presences = new PresenceStore(this.client);
+
+    /**
+     * Whether the bot has been removed from the guild
+     * @type {boolean}
+     */
+    this.deleted = false;
 
     if (!data) return;
     if (data.unavailable) {
@@ -196,6 +202,13 @@ class Guild extends Base {
      * @type {number}
      */
     this.joinedTimestamp = data.joined_at ? new Date(data.joined_at).getTime() : this.joinedTimestamp;
+
+    /**
+     * The value set for a guild's default message notifications
+     * @type {DefaultMessageNotifications|number}
+     */
+    this.defaultMessageNotifications = DefaultMessageNotifications[data.default_message_notifications] ||
+      data.default_message_notifications;
 
     this.id = data.id;
     this.available = !data.unavailable;
@@ -497,7 +510,7 @@ class Guild extends Base {
    * // Fetch invite creator by their id
    * guild.fetchInvites()
    *  .then(invites => console.log(invites.find(invite => invite.inviter.id === '84484653687267328')))
-   *  .then(console.error);
+   *  .catch(console.error);
    */
   fetchInvites() {
     return this.client.api.guilds(this.id).invites.get()
@@ -946,10 +959,13 @@ class Guild extends Base {
       this.memberCount === guild.memberCount &&
       this.large === guild.large &&
       this.icon === guild.icon &&
-      Util.arraysEqual(this.features, guild.features) &&
       this.ownerID === guild.ownerID &&
       this.verificationLevel === guild.verificationLevel &&
-      this.embedEnabled === guild.embedEnabled;
+      this.embedEnabled === guild.embedEnabled &&
+      (this.features === guild.features || (
+        this.features.length === guild.features.length &&
+        this.features.every((feat, i) => feat === guild.features[i]))
+      );
 
     if (equal) {
       if (this.embedChannel) {
