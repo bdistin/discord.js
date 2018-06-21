@@ -199,7 +199,10 @@ class StreamDispatcher extends Writable {
   }
 
   _step(done) {
-    this._writeCallback = done;
+    this._writeCallback = () => {
+      this._writeCallback = null;
+      done();
+    };
     if (this.pausedSince) return;
     if (!this.streams.broadcast) {
       const next = FRAME_LENGTH + (this.count * FRAME_LENGTH) - (Date.now() - this.startTime - this.pausedTime);
@@ -212,6 +215,11 @@ class StreamDispatcher extends Writable {
     if (this._sdata.sequence >= 2 ** 16) this._sdata.sequence = 0;
     if (this._sdata.timestamp >= 2 ** 32) this._sdata.timestamp = 0;
     this.count++;
+  }
+
+  _final(callback) {
+    this._writeCallback = null;
+    callback();
   }
 
   _playChunk(chunk) {
@@ -248,7 +256,7 @@ class StreamDispatcher extends Writable {
     packetBuffer.writeUIntBE(this.player.voiceConnection.authentication.ssrc, 8, 4);
 
     packetBuffer.copy(nonce, 0, 0, 12);
-    return Buffer.concat([packetBuffer, ...this._encrypt(buffer, sequence)]);
+    return Buffer.concat([packetBuffer, ...this._encrypt(buffer)]);
   }
 
   _sendPacket(packet) {

@@ -113,7 +113,7 @@ class Shard extends EventEmitter {
   }
 
   /**
-   * Kills this shard.
+   * Immediately kills the shard's process and does not restart it.
    */
   kill() {
     this.process.removeListener('exit', this._exitListener);
@@ -140,10 +140,9 @@ class Shard extends EventEmitter {
    */
   send(message) {
     return new Promise((resolve, reject) => {
-      const sent = this.process.send(message, err => {
+      this.process.send(message, err => {
         if (err) reject(err); else resolve(this);
       });
-      if (!sent) throw new Error('SHARDING_CHILD_CONNECTION');
     });
   }
 
