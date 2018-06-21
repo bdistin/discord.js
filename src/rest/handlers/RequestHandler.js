@@ -1,5 +1,11 @@
 const DiscordAPIError = require('../DiscordAPIError');
-const { Events: { RATE_LIMIT } } = require('../../util/Constants');
+const { Events: { RATE_LIMIT }, browser } = require('../../util/Constants');
+
+function parseResponse(res) {
+  if (res.headers.get('content-type').startsWith('application/json')) return res.json();
+  if (browser) return res.blob();
+  return res.buffer();
+}
 
 class RequestHandler {
   constructor(manager, handler) {
@@ -23,7 +29,7 @@ class RequestHandler {
   }
 
   get _inactive() {
-    return this.queue.length === 0 && !this.limited && Date.now() > this.resetTime && this.busy !== true;
+    return this.queue.length === 0 && !this.limited && this.busy !== true;
   }
 
   /* eslint-disable prefer-promise-reject-errors */
@@ -68,34 +74,41 @@ class RequestHandler {
           resolve();
         }
       };
-      item.request.gen().end((err, res) => {
+      item.request.make().then(res => {
         if (res && res.headers) {
-          if (res.headers['x-ratelimit-global']) this.manager.globallyRateLimited = true;
-          this.limit = Number(res.headers['x-ratelimit-limit']);
-          this.resetTime = Date.now() + Number(res.headers['retry-after']);
-          this.remaining = Number(res.headers['x-ratelimit-remaining']);
+          if (res.headers.get('x-ratelimit-global')) this.manager.globallyRateLimited = true;
+          this.limit = Number(res.headers.get('x-ratelimit-limit') || Infinity);
+          const reset = res.headers.get('x-ratelimit-reset');
+          this.resetTime = reset !== null ?
+            (Number(reset) * 1e3) - new Date(res.headers.get('date') || Date.now()).getTime() + Date.now() :
+            Date.now();
+          const remaining = res.headers.get('x-ratelimit-remaining');
+          this.remaining = remaining !== null ? Number(remaining) : 1;
         }
-        if (err) {
-          if (err.status === 429) {
-            this.queue.unshift(item);
-            finish(Number(res.headers['retry-after']) + this.client.options.restTimeOffset);
-          } else if (err.status >= 500 && err.status < 600) {
-            if (item.retried) {
-              item.reject(err);
-              finish();
-            } else {
-              item.retried = true;
-              this.queue.unshift(item);
-              finish(1e3 + this.client.options.restTimeOffset);
-            }
-          } else {
-            item.reject(err.status >= 400 && err.status < 500 ?
-              new DiscordAPIError(res.request.path, res.body, res.request.method) : err);
+
+        if (res.ok) {
+          parseResponse(res).then(item.resolve, item.reject);
+          finish();
+          return;
+        }
+
+        if (res.status === 429) {
+          this.queue.unshift(item);
+          finish(Number(res.headers.get('retry-after')) + this.client.options.restTimeOffset);
+        } else if (res.status >= 500 && res.status < 600) {
+          if (item.retried) {
+            item.reject(res);
             finish();
+          } else {
+            item.retried = true;
+            this.queue.unshift(item);
+            finish(1e3 + this.client.options.restTimeOffset);
           }
         } else {
-          const data = res && res.body ? res.body : {};
-          item.resolve(data);
+          parseResponse(res).then(data => {
+            item.reject(res.status >= 400 && res.status < 500 ?
+              new DiscordAPIError(item.path, data, item.method) : res);
+          }, item.reject);
           finish();
         }
       });
