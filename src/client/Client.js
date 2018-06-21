@@ -389,9 +389,6 @@ class Client extends BaseClient {
     if (options.shardCount !== 'auto' && (typeof options.shardCount !== 'number' || isNaN(options.shardCount))) {
       throw new TypeError('CLIENT_INVALID_OPTION', 'shardCount', 'a number or "auto"');
     }
-    if (typeof options.shardId !== 'number' || isNaN(options.shardId)) {
-      throw new TypeError('CLIENT_INVALID_OPTION', 'shardId', 'a number');
-    }
     if (options.shards && typeof options.shards !== 'number' && !Array.isArray(options.shards)) {
       throw new TypeError('CLIENT_INVALID_OPTION', 'shards', 'a number or array');
     }
