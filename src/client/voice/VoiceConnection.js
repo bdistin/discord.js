@@ -37,12 +37,6 @@ class VoiceConnection extends EventEmitter {
     this.voiceManager = voiceManager;
 
     /**
-     * The client that instantiated this connection
-     * @type {Client}
-     */
-    this.client = voiceManager.client;
-
-    /**
      * The voice channel this connection is currently serving
      * @type {VoiceChannel}
      */
@@ -117,6 +111,14 @@ class VoiceConnection extends EventEmitter {
   }
 
   /**
+   * The client that instantiated this connection
+   * @type {Client}
+   */
+  get client() {
+    return this.voiceManager.client;
+  }
+
+  /**
    * The current stream dispatcher (if any)
    * @type {?StreamDispatcher}
    * @readonly
@@ -137,7 +139,7 @@ class VoiceConnection extends EventEmitter {
     this.sockets.ws.sendPacket({
       op: VoiceOPCodes.SPEAKING,
       d: {
-        speaking: this.speaking,
+        speaking: this.speaking ? 1 : 0,
         delay: 0,
         ssrc: this.authentication.ssrc,
       },
@@ -425,9 +427,10 @@ class VoiceConnection extends EventEmitter {
    * @private
    */
   onSpeaking({ user_id, ssrc, speaking }) {
+    speaking = Boolean(speaking);
     const guild = this.channel.guild;
     const user = this.client.users.get(user_id);
-    this.ssrcMap.set(+ssrc, user);
+    this.ssrcMap.set(+ssrc, user_id);
     /**
      * Emitted whenever a user starts/stops speaking.
      * @event VoiceConnection#speaking

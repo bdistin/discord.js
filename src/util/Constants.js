@@ -196,6 +196,9 @@ exports.VoiceOPCodes = {
   HEARTBEAT: 3,
   SESSION_DESCRIPTION: 4,
   SPEAKING: 5,
+  HELLO: 8,
+  CLIENT_CONNECT: 12,
+  CLIENT_DISCONNECT: 13,
 };
 
 exports.Events = {
