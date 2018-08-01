@@ -21,7 +21,6 @@ const browser = exports.browser = typeof window !== 'undefined';
  * @property {boolean} [fetchAllMembers=false] Whether to cache all guild members and users upon startup, as well as
  * upon joining a guild (should be avoided whenever possible)
  * @property {boolean} [disableEveryone=false] Default value for {@link MessageOptions#disableEveryone}
- * @property {boolean} [sync=false] Whether to periodically sync guilds (for user accounts)
  * @property {number} [restWsBridgeTimeout=5000] Maximum time permitted between REST responses and their
  * corresponding websocket events
  * @property {number} [restTimeOffset=500] Extra time in millseconds to wait before continuing to make REST
@@ -45,7 +44,6 @@ exports.DefaultOptions = {
   messageSweepInterval: 0,
   fetchAllMembers: false,
   disableEveryone: false,
-  sync: false,
   restWsBridgeTimeout: 5000,
   disabledEvents: [],
   restTimeOffset: 500,
@@ -110,6 +108,13 @@ function makeImageUrl(root, { format = 'webp', size } = {}) {
   if (size && !AllowedImageSizes.includes(size)) throw new RangeError('IMAGE_SIZE', size);
   return `${root}.${format}${size ? `?size=${size}` : ''}`;
 }
+/**
+ * Options for Image URLs.
+ * @typedef {Object} ImageURLOptions
+ * @property {string} [format] One of `webp`, `png`, `jpg`, `gif`. If no format is provided,
+ * it will be `gif` for animated avatars or otherwise `webp`
+ * @property {number} [size] One of `16`, `32`, `64`, `128`, `256`, `512`, `1024`, `2048`
+ */
 
 exports.Endpoints = {
   CDN(root) {
@@ -196,6 +201,9 @@ exports.VoiceOPCodes = {
   HEARTBEAT: 3,
   SESSION_DESCRIPTION: 4,
   SPEAKING: 5,
+  HELLO: 8,
+  CLIENT_CONNECT: 12,
+  CLIENT_DISCONNECT: 13,
 };
 
 exports.Events = {
@@ -236,7 +244,6 @@ exports.Events = {
   USER_UPDATE: 'userUpdate',
   USER_NOTE_UPDATE: 'userNoteUpdate',
   USER_SETTINGS_UPDATE: 'clientUserSettingsUpdate',
-  USER_GUILD_SETTINGS_UPDATE: 'clientUserGuildSettingsUpdate',
   PRESENCE_UPDATE: 'presenceUpdate',
   VOICE_STATE_UPDATE: 'voiceStateUpdate',
   VOICE_BROADCAST_SUBSCRIBE: 'subscribe',
@@ -254,7 +261,6 @@ exports.Events = {
  * The type of a websocket message event, e.g. `MESSAGE_CREATE`. Here are the available events:
  * * READY
  * * RESUMED
- * * GUILD_SYNC
  * * GUILD_CREATE
  * * GUILD_DELETE
  * * GUILD_UPDATE
@@ -292,7 +298,6 @@ exports.Events = {
 exports.WSEvents = keyMirror([
   'READY',
   'RESUMED',
-  'GUILD_SYNC',
   'GUILD_CREATE',
   'GUILD_DELETE',
   'GUILD_UPDATE',
@@ -318,15 +323,10 @@ exports.WSEvents = keyMirror([
   'MESSAGE_REACTION_REMOVE',
   'MESSAGE_REACTION_REMOVE_ALL',
   'USER_UPDATE',
-  'USER_NOTE_UPDATE',
-  'USER_SETTINGS_UPDATE',
-  'USER_GUILD_SETTINGS_UPDATE',
   'PRESENCE_UPDATE',
   'VOICE_STATE_UPDATE',
   'TYPING_START',
   'VOICE_SERVER_UPDATE',
-  'RELATIONSHIP_ADD',
-  'RELATIONSHIP_REMOVE',
 ]);
 
 /**
@@ -380,13 +380,6 @@ exports.ExplicitContentFilterTypes = [
   'DISABLED',
   'NON_FRIENDS',
   'FRIENDS_AND_NON_FRIENDS',
-];
-
-exports.MessageNotificationTypes = [
-  'EVERYTHING',
-  'MENTIONS',
-  'NOTHING',
-  'INHERIT',
 ];
 
 exports.UserSettingsMap = {
@@ -520,60 +513,6 @@ exports.UserSettingsMap = {
       mutualFriends: flags.all ? true : flags.mutualFriends || false,
     };
   },
-};
-
-exports.UserGuildSettingsMap = {
-  message_notifications: function messageNotifications(type) { // eslint-disable-line func-name-matching
-    /**
-     * The type of message that should notify you.
-     * One of `EVERYTHING`, `MENTIONS`, `NOTHING`
-     * @name ClientUserGuildSettings#messageNotifications
-     * @type {string}
-     */
-    return exports.MessageNotificationTypes[type];
-  },
-  /**
-   * Whether to receive mobile push notifications
-   * @name ClientUserGuildSettings#mobilePush
-   * @type {boolean}
-   */
-  mobile_push: 'mobilePush',
-  /**
-   * Whether the guild is muted or not
-   * @name ClientUserGuildSettings#muted
-   * @type {boolean}
-   */
-  muted: 'muted',
-  /**
-   * Whether to suppress everyone messages
-   * @name ClientUserGuildSettings#suppressEveryone
-   * @type {boolean}
-   */
-  suppress_everyone: 'suppressEveryone',
-  /**
-   * A collection containing all the channel overrides
-   * @name ClientUserGuildSettings#channelOverrides
-   * @type {Collection<ClientUserChannelOverride>}
-   */
-  channel_overrides: 'channelOverrides',
-};
-
-exports.UserChannelOverrideMap = {
-  message_notifications: function messageNotifications(type) { // eslint-disable-line func-name-matching
-    /**
-     * The type of message that should notify you.
-     * One of `EVERYTHING`, `MENTIONS`, `NOTHING`, `INHERIT`
-     * @name ClientUserChannelOverride#messageNotifications
-     * @type {string}
-     */
-    return exports.MessageNotificationTypes[type];
-  },
-  /**
-   * Whether the channel is muted or not
-   * @name ClientUserChannelOverride#muted
-   * @type {boolean}
-   */
-  muted: 'muted',
 };
 
 /**

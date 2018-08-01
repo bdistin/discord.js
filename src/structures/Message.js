@@ -238,6 +238,15 @@ class Message extends Base {
   }
 
   /**
+   * The url to jump to this message
+   * @type {string}
+   * @readonly
+   */
+  get url() {
+    return `https://discordapp.com/channels/${this.guild ? this.guild.id : '@me'}/${this.channel.id}/${this.id}`;
+  }
+
+  /**
    * The message contents with all mentions replaced by the equivalent text.
    * If mentions cannot be resolved to a name, the relevant mention in the message content will not be converted.
    * @type {string}
@@ -497,20 +506,6 @@ class Message extends Base {
       options = {};
     }
     return this.channel.send(content, Object.assign(options, { reply: this.member || this.author }));
-  }
-
-  /**
-   * Marks the message as read.
-   * <warn>This is only available when using a user account.</warn>
-   * @returns {Promise<Message>}
-   */
-  acknowledge() {
-    return this.client.api.channels(this.channel.id).messages(this.id).ack
-      .post({ data: { token: this.client.rest._ackToken } })
-      .then(res => {
-        if (res.token) this.client.rest._ackToken = res.token;
-        return this;
-      });
   }
 
   /**

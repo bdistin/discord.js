@@ -15,7 +15,7 @@ class RequestHandler {
     this.limit = Infinity;
     this.resetTime = null;
     this.remaining = 1;
-
+    this.busy = false;
     this.queue = [];
   }
 
@@ -107,7 +107,7 @@ class RequestHandler {
         } else {
           parseResponse(res).then(data => {
             item.reject(res.status >= 400 && res.status < 500 ?
-              new DiscordAPIError(item.path, data, item.method) : res);
+              new DiscordAPIError(item.request.route, data, item.request.method) : res);
           }, item.reject);
           finish();
         }

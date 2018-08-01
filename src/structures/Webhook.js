@@ -1,5 +1,5 @@
 const DataResolver = require('../util/DataResolver');
-const { Channel } = require('./Channel');
+const Channel = require('./Channel');
 const { createMessage } = require('./shared');
 
 /**
@@ -28,7 +28,7 @@ class Webhook {
      * The token for the webhook
      * @type {string}
      */
-    this.token = data.token;
+    Object.defineProperty(this, 'token', { value: data.token, writable: true, configurable: true });
 
     /**
      * The avatar for the webhook

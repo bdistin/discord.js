@@ -37,9 +37,9 @@
     "form-data": "^2.3.2",
     "node-fetch": "^2.1.2",
     "pako": "^1.0.0",
-    "prism-media": "^0.3.0",
+    "prism-media": "hydrabolt/prism-media",
     "tweetnacl": "^1.0.0",
-    "ws": "^4.0.0"
+    "ws": "^6.0.0"
   },
   "peerDependencies": {
     "bufferutil": "^3.0.0",
@@ -52,7 +52,7 @@
   "devDependencies": {
     "@types/node": "^10.0.3",
     "discord.js-docgen": "discordjs/docgen",
-    "eslint": "^4.17.0",
+    "eslint": "^5.0.1",
     "json-filter-loader": "^1.0.0",
     "uglifyjs-webpack-plugin": "^1.1.8",
     "webpack": "^4.5.0",
