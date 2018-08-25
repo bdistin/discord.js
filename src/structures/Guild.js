@@ -1,8 +1,9 @@
 const Invite = require('./Invite');
+const Integration = require('./Integration');
 const GuildAuditLogs = require('./GuildAuditLogs');
 const Webhook = require('./Webhook');
 const VoiceRegion = require('./VoiceRegion');
-const { ChannelTypes, DefaultMessageNotifications, Events, browser } = require('../util/Constants');
+const { ChannelTypes, DefaultMessageNotifications, browser } = require('../util/Constants');
 const Collection = require('../util/Collection');
 const Util = require('../util/Util');
 const DataResolver = require('../util/DataResolver');
@@ -12,6 +13,7 @@ const RoleStore = require('../stores/RoleStore');
 const GuildEmojiStore = require('../stores/GuildEmojiStore');
 const GuildChannelStore = require('../stores/GuildChannelStore');
 const PresenceStore = require('../stores/PresenceStore');
+const VoiceStateStore = require('../stores/VoiceStateStore');
 const Base = require('./Base');
 const { Error, TypeError } = require('../errors');
 
@@ -231,13 +233,15 @@ class Guild extends Base {
 
     if (data.presences) {
       for (const presence of data.presences) {
-        this.presences.add(presence);
+        this.presences.add(Object.assign(presence, { guild: this }));
       }
     }
 
-    if (!this.voiceStates) this.voiceStates = new VoiceStateCollection(this);
+    if (!this.voiceStates) this.voiceStates = new VoiceStateStore(this);
     if (data.voice_states) {
-      for (const voiceState of data.voice_states) this.voiceStates.set(voiceState.user_id, voiceState);
+      for (const voiceState of data.voice_states) {
+        this.voiceStates.add(voiceState);
+      }
     }
 
     if (!this.emojis) {
@@ -411,6 +415,42 @@ class Guild extends Base {
   }
 
   /**
+   * Fetches a collection of integrations to this guild.
+   * Resolves with a collection mapping integrations by their ids.
+   * @returns {Promise<Collection<string, Integration>>}
+   * @example
+   * // Fetch integrations
+   * guild.fetchIntegrations()
+   *   .then(integrations => console.log(`Fetched ${integrations.size} integrations`))
+   *   .catch(console.error);
+   */
+  fetchIntegrations() {
+    return this.client.api.guilds(this.id).integrations.get().then(data =>
+      data.reduce((collection, integration) =>
+        collection.set(integration.id, new Integration(this.client, integration, this)),
+      new Collection())
+    );
+  }
+
+  /**
+   * The data for creating an integration.
+   * @typedef {Object} IntegrationData
+   * @property {string} id The integration id
+   * @property {string} type The integration type
+   */
+
+  /**
+   * Creates an integration by attaching an integration object
+   * @param {IntegrationData} data The data for thes integration
+   * @param {string} reason Reason for creating the integration
+   * @returns {Promise<Guild>}
+   */
+  createIntegration(data, reason) {
+    return this.client.api.guilds(this.id).integrations.post({ data, reason })
+      .then(() => this);
+  }
+
+  /**
    * Fetches a collection of invites to this guild.
    * Resolves with a collection mapping invites by their codes.
    * @returns {Promise<Collection<string, Invite>>}
@@ -435,6 +475,26 @@ class Guild extends Base {
         }
         return invites;
       });
+  }
+
+  /**
+   * Fetches the vanity url invite code to this guild.
+   * Resolves with a string matching the vanity url invite code, not the full url.
+   * @returns {Promise<string>}
+   * @example
+   * // Fetch invites
+   * guild.fetchVanityCode()
+   *   .then(code => {
+   *     console.log(`Vanity URL: https://discord.gg/${code}`);
+   *   })
+   *   .catch(console.error);
+   */
+  fetchVanityCode() {
+    if (!this.features.includes('VANITY_URL')) {
+      return Promise.reject(new Error('VANITY_URL'));
+    }
+    return this.client.api.guilds(this.id, 'vanity-url').get()
+      .then(res => res.code);
   }
 
   /**
@@ -464,6 +524,29 @@ class Guild extends Base {
       for (const region of res) regions.set(region.id, new VoiceRegion(region));
       return regions;
     });
+  }
+
+  /**
+   * The Guild Embed object
+   * @typedef {Object} GuildEmbedData
+   * @property {boolean} enabled Whether the embed is enabled
+   * @property {?GuildChannel} channel The embed channel
+   */
+
+  /**
+   * Fetches the guild embed.
+   * @returns {Promise<GuildEmbedData>}
+   * @example
+   * // Fetches the guild embed
+   * guild.fetchEmbed()
+   *   .then(embed => console.log(`The embed is ${embed.enabled ? 'enabled' : 'disabled'}`))
+   *   .catch(console.error);
+   */
+  fetchEmbed() {
+    return this.client.api.guilds(this.id).embed.get().then(data => ({
+      enabled: data.enabled,
+      channel: data.channel_id ? this.channels.get(data.channel_id) : null,
+    }));
   }
 
   /**
@@ -774,6 +857,22 @@ class Guild extends Base {
   }
 
   /**
+   * Edits the guild's embed.
+   * @param {GuildEmbedData} embed The embed for the guild
+   * @param {string} [reason] Reason for changing the guild's embed
+   * @returns {Promise<Guild>}
+   */
+  setEmbed(embed, reason) {
+    return this.client.api.guilds(this.id).embed.patch({
+      data: {
+        enabled: embed.enabled,
+        channel_id: this.channels.resolveID(embed.channel),
+      },
+      reason,
+    }).then(() => this);
+  }
+
+  /**
    * Leaves the guild.
    * @returns {Promise<Guild>}
    * @example
@@ -884,56 +983,6 @@ class Guild extends Base {
     return Util.discordSort(this.channels.filter(c =>
       c.type === channel.type && (category || c.parent === channel.parent)
     ));
-  }
-
-  /**
-   * Handles a user speaking update in a voice channel.
-   * @param {Snowflake} user ID of the user that the update is for
-   * @param {boolean} speaking Whether the user is speaking
-   * @private
-   */
-  _memberSpeakUpdate(user, speaking) {
-    const member = this.members.get(user);
-    if (member && member.speaking !== speaking) {
-      member.speaking = speaking;
-      /**
-       * Emitted once a guild member starts/stops speaking.
-       * @event Client#guildMemberSpeaking
-       * @param {GuildMember} member The member that started/stopped speaking
-       * @param {boolean} speaking Whether or not the member is speaking
-       */
-      this.client.emit(Events.GUILD_MEMBER_SPEAKING, member, speaking);
-    }
-  }
-}
-
-// TODO: Document this thing
-class VoiceStateCollection extends Collection {
-  constructor(guild) {
-    super();
-    this.guild = guild;
-  }
-
-  set(id, voiceState) {
-    const member = this.guild.members.get(id);
-    if (member) {
-      if (member.voiceChannel && member.voiceChannel.id !== voiceState.channel_id) {
-        member.voiceChannel.members.delete(member.id);
-      }
-      if (!voiceState.channel_id) member.speaking = null;
-      const newChannel = this.guild.channels.get(voiceState.channel_id);
-      if (newChannel) newChannel.members.set(member.user.id, member);
-    }
-    super.set(id, voiceState);
-  }
-
-  delete(id) {
-    const voiceState = this.get(id);
-    if (voiceState && voiceState.channel_id) {
-      const channel = this.guild.channels.get(voiceState.channel_id);
-      if (channel) channel.members.delete(id);
-    }
-    return super.delete(id);
   }
 }
 

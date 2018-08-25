@@ -1,40 +1,21 @@
-const PresenceStore = require('./PresenceStore');
+const { Presence } = require('./Presence');
 const Collection = require('../util/Collection');
 const { ActivityTypes, OPCodes } = require('../util/Constants');
-const { Presence } = require('../structures/Presence');
 const { TypeError } = require('../errors');
 
-/**
- * Stores the client presence and other presences.
- * @extends {PresenceStore}
- */
-class ClientPresenceStore extends PresenceStore {
-  constructor(...args) {
-    super(...args);
-    this.clientPresence = new Presence(this.client, {
-      status: 'online',
-      afk: false,
-      since: null,
-      activity: null,
-    });
+class ClientPresence extends Presence {
+  constructor(client, data = {}) {
+    super(client, Object.assign(data, { status: 'online', user: { id: null } }));
   }
 
   async setClientPresence(presence) {
     const packet = await this._parse(presence);
-    this.clientPresence.patch(packet);
-    if (this.clientPresence.shard === 'all') {
-      this.client.ws.broadcast({ op: OPCodes.STATUS_UPDATE, d: packet });
-    } else {
-      const shard = this.client.ws.shards.get(this.clientPresence.shard);
-      if (shard) shard.send({ op: OPCodes.STATUS_UPDATE, d: packet });
-    }
-    return this.clientPresence;
+    this.patch(packet);
+    this.client.ws.send({ op: OPCodes.STATUS_UPDATE, d: packet });
+    return this;
   }
 
-  async _parse({ status, since, afk, shard, activity }) { // eslint-disable-line complexity
-    if (shard && shard !== 'all' && !this.client.ws.shards.get(shard)) {
-      throw new TypeError('INVALID_SHARD', shard);
-    }
+  async _parse({ status, since, afk, activity }) { // eslint-disable-line complexity
     const applicationID = activity && (activity.application ? activity.application.id || activity.application : null);
     let assets = new Collection();
     if (activity) {
@@ -51,8 +32,7 @@ class ClientPresenceStore extends PresenceStore {
     const packet = {
       afk: afk != null ? afk : false, // eslint-disable-line eqeqeq
       since: since != null ? since : null, // eslint-disable-line eqeqeq
-      status: status || this.clientPresence.status,
-      shard: shard || shard === 0 ? shard : 'all',
+      status: status || this.status,
       game: activity ? {
         type: activity.type,
         name: activity.name,
@@ -74,7 +54,7 @@ class ClientPresenceStore extends PresenceStore {
     };
 
     if ((status || afk || since) && !activity) {
-      packet.game = this.clientPresence.activity;
+      packet.game = this.activity;
     }
 
     if (packet.game) {
@@ -86,4 +66,4 @@ class ClientPresenceStore extends PresenceStore {
   }
 }
 
-module.exports = ClientPresenceStore;
+module.exports = ClientPresence;

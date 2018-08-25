@@ -10,7 +10,7 @@ const Messages = {
   WS_CONNECTION_EXISTS: 'There is already an existing WebSocket connection.',
   WS_NOT_OPEN: (data = 'data') => `Websocket not open to send ${data}`,
 
-  PERMISSIONS_INVALID: 'Invalid permission string or number.',
+  BITFIELD_INVALID: 'Invalid bitfield flag or number.',
 
   RATELIMIT_INVALID_METHOD: 'Unknown rate limiting method.',
 
@@ -52,6 +52,8 @@ const Messages = {
   VOICE_PLAY_INTERFACE_NO_BROADCAST: 'A broadcast cannot be played in this context.',
   VOICE_PLAY_INTERFACE_BAD_TYPE: 'Unknown stream type',
   VOICE_PRISM_DEMUXERS_NEED_STREAM: 'To play a webm/ogg stream, you need to pass a ReadableStream.',
+
+  VOICE_STATE_UNCACHED_MEMBER: 'The member of this voice state is uncached.',
 
   OPUS_ENGINE_MISSING: 'Couldn\'t find an Opus engine.',
 
@@ -96,6 +98,8 @@ const Messages = {
   EMOJI_MANAGED: 'Emoji is managed and has no Author.',
 
   REACTION_RESOLVE_USER: 'Couldn\'t resolve the user ID to remove from the reaction.',
+
+  VANITY_URL: 'This guild does not have the VANITY_URL feature enabled.',
 };
 
 for (const [name, message] of Object.entries(Messages)) register(name, message);

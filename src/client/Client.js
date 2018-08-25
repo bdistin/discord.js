@@ -14,7 +14,7 @@ const VoiceBroadcast = require('./voice/VoiceBroadcast');
 const UserStore = require('../stores/UserStore');
 const ChannelStore = require('../stores/ChannelStore');
 const GuildStore = require('../stores/GuildStore');
-const ClientPresenceStore = require('../stores/ClientPresenceStore');
+const ClientPresence = require('../structures/ClientPresence');
 const GuildEmojiStore = require('../stores/GuildEmojiStore');
 const { Events, browser } = require('../util/Constants');
 const DataResolver = require('../util/DataResolver');
@@ -99,10 +99,11 @@ class Client extends BaseClient {
     this.channels = new ChannelStore(this);
 
     /**
-     * Presences that have been received for the client user, mapped by user IDs
-     * @type {ClientPresenceStore<Snowflake, Presence>}
+     * The presence of the Client
+     * @private
+     * @type {ClientPresence}
      */
-    this.presences = new ClientPresenceStore(this);
+    this.presence = new ClientPresence(this);
 
     Object.defineProperty(this, 'token', { writable: true });
     if (!browser && !this.token && 'CLIENT_TOKEN' in process.env) {
@@ -136,19 +137,7 @@ class Client extends BaseClient {
     this.broadcasts = [];
 
     /**
-     * Timeouts set by {@link Client#setTimeout} that are still active
-     * @type {Set<Timeout>}
-     * @private
      */
-    this._timeouts = new Set();
-
-    /**
-     * Intervals set by {@link Client#setInterval} that are still active
-     * @type {Set<Timeout>}
-     * @private
-     */
-    this._intervals = new Set();
-
     if (this.options.messageSweepInterval > 0) {
       this.setInterval(this.sweepMessages.bind(this), this.options.messageSweepInterval * 1000);
     }
@@ -375,7 +364,7 @@ class Client extends BaseClient {
    *   .catch(console.error);
    */
   generateInvite(permissions) {
-    permissions = typeof permissions === 'undefined' ? 0 : Permissions.resolve(permissions);
+    permissions = Permissions.resolve(permissions);
     return this.fetchApplication().then(application =>
       `https://discordapp.com/oauth2/authorize?client_id=${application.id}&permissions=${permissions}&scope=bot`
     );

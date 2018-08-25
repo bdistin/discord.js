@@ -105,11 +105,10 @@ class User extends Base {
    * @readonly
    */
   get presence() {
-    if (this.client.presences.has(this.id)) return this.client.presences.get(this.id);
     for (const guild of this.client.guilds.values()) {
       if (guild.presences.has(this.id)) return guild.presences.get(this.id);
     }
-    return new Presence(this.client);
+    return new Presence(this.client, { user: { id: this.id } });
   }
 
   /**
@@ -142,7 +141,7 @@ class User extends Base {
   }
 
   /**
-   * The Discord "tag" (e.g. `hydrabolt#0086`) for this user
+   * The Discord "tag" (e.g. `hydrabolt#0001`) for this user
    * @type {string}
    * @readonly
    */
@@ -186,7 +185,7 @@ class User extends Base {
    * @readonly
    */
   get dmChannel() {
-    return this.client.channels.filter(c => c.type === 'dm').find(c => c.recipient.id === this.id) || null;
+    return this.client.channels.find(c => c.type === 'dm' && c.recipient.id === this.id) || null;
   }
 
   /**

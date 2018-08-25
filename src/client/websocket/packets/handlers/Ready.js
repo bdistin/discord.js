@@ -9,6 +9,7 @@ class ReadyHandler extends AbstractHandler {
 
     packet.shard.heartbeat();
 
+    client.presence.userID = data.user.id;
     if (!ClientUser) ClientUser = require('../../../../structures/ClientUser');
     const clientUser = new ClientUser(client, data.user);
     client.user = clientUser;
@@ -20,20 +21,6 @@ class ReadyHandler extends AbstractHandler {
       client.guilds.add(guild);
     }
     for (const privateDM of data.private_channels) client.channels.add(privateDM);
-    for (const presence of data.presences || []) client.presences.add(presence);
-
-    if (!client.users.has('1')) {
-      client.users.add({
-        id: '1',
-        username: 'Clyde',
-        discriminator: '0000',
-        avatar: 'https://discordapp.com/assets/f78426a064bc9dd24847519259bc42af.png',
-        bot: true,
-        status: 'online',
-        activity: null,
-        verified: true,
-      });
-    }
 
     const t = client.setTimeout(() => {
       packet.shard.triggerReady();

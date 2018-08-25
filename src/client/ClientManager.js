@@ -50,9 +50,9 @@ class ClientManager {
     }
     endpoint.get({ forceBot }).then(async res => {
       if (this.client.options.presence != null) { // eslint-disable-line eqeqeq
-        const presence = await this.client.presences._parse(this.client.options.presence);
+        const presence = await this.client.presence._parse(this.client.options.presence);
         this.client.options.ws.presence = presence;
-        this.client.presences.clientPresence.patch(presence);
+        this.client.presence.patch(presence);
       }
       if (this.client.options.shardCount === 'auto') {
         this.client.emit(Events.DEBUG, `Using recommended shard count: ${res.shards}`);
