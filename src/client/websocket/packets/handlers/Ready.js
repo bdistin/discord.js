@@ -20,7 +20,6 @@ class ReadyHandler extends AbstractHandler {
       guild.shardID = packet.shard.id;
       client.guilds.add(guild);
     }
-    for (const privateDM of data.private_channels) client.channels.add(privateDM);
 
     const t = client.setTimeout(() => {
       packet.shard.triggerReady();

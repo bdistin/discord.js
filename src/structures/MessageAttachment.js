@@ -11,6 +11,10 @@ class MessageAttachment {
    */
   constructor(attachment, name = null, data) {
     this.attachment = attachment;
+    /**
+     * The name of this attachment
+     * @type {?string}
+     */
     this.name = name;
     if (data) this._patch(data);
   }
@@ -66,13 +70,13 @@ class MessageAttachment {
      * The height of this attachment (if an image or video)
      * @type {?number}
      */
-    this.height = data.height;
+    this.height = typeof data.height !== 'undefined' ? data.height : null;
 
     /**
      * The width of this attachment (if an image or video)
      * @type {?number}
      */
-    this.width = data.width;
+    this.width = typeof data.width !== 'undefined' ? data.width : null;
   }
 
   toJSON() {
