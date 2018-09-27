@@ -12,7 +12,7 @@ class ClientPresence extends Presence {
     const packet = await this._parse(presence);
     this.patch(packet);
     if (shard === 'all') {
-      for (const wsShard of this.client.ws.shards) wsShard.send({ op: OPCodes.STATUS_UPDATE, d: packet });
+      for (const wsShard of this.client.ws.shards.values()) wsShard.send({ op: OPCodes.STATUS_UPDATE, d: packet });
     } else {
       this.client.ws.shards.get(shard).send({ op: OPCodes.STATUS_UPDATE, d: packet });
     }
