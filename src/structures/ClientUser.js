@@ -90,6 +90,7 @@ class ClientUser extends Structures.get('User') {
   /**
    * Sets the full presence of the client user.
    * @param {PresenceData} data Data for the presence
+   * @param {'all'|number} [shard='all'] The shard/s to update
    * @returns {Promise<Presence>}
    * @example
    * // Set the client user's presence
@@ -97,8 +98,8 @@ class ClientUser extends Structures.get('User') {
    *   .then(console.log)
    *   .catch(console.error);
    */
-  setPresence(data) {
-    return this.client.presence.setClientPresence(data);
+  setPresence(data, shard) {
+    return this.client.presence.setClientPresence(data, shard);
   }
 
   /**
@@ -113,6 +114,7 @@ class ClientUser extends Structures.get('User') {
   /**
    * Sets the status of the client user.
    * @param {PresenceStatus} status Status to change to
+   * @param {'all'|number} [shard='all'] The shard/s to update
    * @returns {Promise<Presence>}
    * @example
    * // Set the client user's status
@@ -120,8 +122,8 @@ class ClientUser extends Structures.get('User') {
    *   .then(console.log)
    *   .catch(console.error);
    */
-  setStatus(status) {
-    return this.setPresence({ status });
+  setStatus(status, shard) {
+    return this.setPresence({ status }, shard);
   }
 
   /**
@@ -130,6 +132,7 @@ class ClientUser extends Structures.get('User') {
    * @param {Object} [options] Options for setting the activity
    * @param {string} [options.url] Twitch stream URL
    * @param {ActivityType|number} [options.type] Type of the activity
+   * @param {'all'|number} [options.shard='all'] The shard/s to update
    * @returns {Promise<Presence>}
    * @example
    * // Set the client user's activity
@@ -137,20 +140,21 @@ class ClientUser extends Structures.get('User') {
    *   .then(presence => console.log(`Activity set to ${presence.game.name}`))
    *   .catch(console.error);
    */
-  setActivity(name, { url, type } = {}) {
-    if (!name) return this.setPresence({ activity: null });
+  setActivity(name, { url, type, shard } = {}) {
+    if (!name) return this.setPresence({ activity: null }, shard);
     return this.setPresence({
       activity: { name, type, url },
-    });
+    }, shard);
   }
 
   /**
    * Sets/removes the AFK flag for the client user.
    * @param {boolean} afk Whether or not the user is AFK
+   * @param {'all'|number} [shard='all'] The shard/s to update
    * @returns {Promise<Presence>}
    */
-  setAFK(afk) {
-    return this.setPresence({ afk });
+  setAFK(afk, shard) {
+    return this.setPresence({ afk }, shard);
   }
 
   /**
