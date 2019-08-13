@@ -17,8 +17,27 @@ function buildRoute(manager) {
           stackTrace = {};
           Error.captureStackTrace(stackTrace, this.get);
         }
-
+        // custom version, old in comment below
+        let restNull = false;
         return options => manager.request(name, route.join('/'), Object.assign({
+          versioned: manager.versioned,
+          route: route.map((r, i) => {
+            if (route[i - 1] === 'reactions' || restNull) {
+              restNull = true;
+              return null;
+            }
+            if (/\d{16,19}/g.test(r)) return /channels|guilds/.test(route[i - 1]) ? r : ':id';
+            return r;
+          }).filter(v => v !== null).join('/'),
+        }, options)).catch(error => {
+          if (stackTrace && (error instanceof Error)) {
+            stackTrace.name = error.name;
+            stackTrace.message = error.message;
+            error.stack = stackTrace.stack;
+          }
+          throw error;
+        });
+        /*return options => manager.request(name, route.join('/'), Object.assign({
           versioned: manager.versioned,
           route: route.map((r, i) => {
             if (/\d{16,19}/g.test(r)) return /channels|guilds/.test(route[i - 1]) ? r : ':id';
@@ -32,7 +51,7 @@ function buildRoute(manager) {
             error.stack = stackTrace.stack;
           }
           throw error;
-        });
+        });*/
       }
       route.push(name);
       return new Proxy(noop, handler);
